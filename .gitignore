@@ -8,3 +8,8 @@ __pycache__/
 /build/
 /dist/
 *.manifest
+
+# Local tooling (per-machine, not shared)
+.claude/settings.local.json
+.claude/tdd-guard/
+.vscode/

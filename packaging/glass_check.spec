@@ -14,14 +14,16 @@ a = Analysis(
     [os.path.join(ROOT, "glass_check.py")],
     pathex=[ROOT],
     binaries=[],
-    datas=[],
-    # Pillow (pulled in by pdfplumber) ships a tkinter bridge that PyInstaller
-    # does not always detect automatically.
-    hiddenimports=["PIL._tkinter_finder"],
+    # The window is HTML: without web/ inside the bundle the app opens blank.
+    datas=[(os.path.join(ROOT, "web"), "web")],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    # pywebview probes several GUI toolkits on import; on macOS it uses the
+    # system WebKit, so none of these belong in the bundle.
+    excludes=["PyQt5", "PyQt6", "PySide2", "PySide6", "qtpy", "gi",
+              "cefpython3", "tkinter"],
     noarchive=False,
 )
 pyz = PYZ(a.pure, a.zipped_data)

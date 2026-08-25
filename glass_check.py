@@ -1,118 +1,182 @@
-"""Kontrola skla — GUI: cross-check a glass order xlsx against an invoice pdf."""
+"""Kontrola skla — okno: porovná objednávku skel (xlsx) s fakturou (pdf).
+
+Spustit:  python glass_check.py
+Veškeré porovnávání dělají invoice_parser, order_parser, matcher a report;
+tohle je jen obal: nativní okno s webovým jádrem, vzhled je ve web/index.html.
+"""
 from __future__ import annotations
 
-import tkinter as tk
+import json
+import os
+import sys
 import traceback
-from tkinter import filedialog, messagebox, ttk
+from collections import Counter
+
+import webview
+from webview.dom import DOMEventHandler
 
 from invoice_parser import parse_invoice
 from matcher import match_items
 from order_parser import parse_order
 from report import result_row, write_report
 
-_TAG_COLORS = {"OK": "#c6efce", "WARNING": "#ffeb9c",
-               "MISSING": "#ffc7ce", "EXTRA": "#ffc7ce"}
-_COLUMNS = ["Stav", "Objekt", "Pozice", "Rozměr obj.", "Rozměr fakt.",
-            "Ks obj.", "Ks fakt.", "Skladba obj.", "Skladba fakt.", "Problémy"]
+
+def slozka_webu():
+    """HTML se do .exe/.app balí přes --add-data, rozbalí se do sys._MEIPASS."""
+    koren = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(koren, "web")
 
 
-class App(tk.Tk):
-    def __init__(self) -> None:
-        super().__init__()
-        self.title("Kontrola skla — objednávka vs. faktura")
-        self.geometry("1200x600")
-        self.pdf_path = tk.StringVar()
-        self.xlsx_path = tk.StringVar()
-        self.results = []
+# Vedle spustitelného souboru se psát nedá (Program Files, podepsaný .app),
+# domovský adresář jde vždy.
+NASTAVENI = os.path.join(os.path.expanduser("~"), ".kontrola_skla")
 
-        picker = ttk.Frame(self, padding=8)
-        picker.pack(fill="x")
-        self._file_row(picker, 0, "Faktura (PDF):", self.pdf_path,
-                       [("PDF", "*.pdf")])
-        self._file_row(picker, 1, "Objednávka (Excel):", self.xlsx_path,
-                       [("Excel", "*.xlsx")])
-        picker.columnconfigure(1, weight=1)
 
-        bar = ttk.Frame(self, padding=(8, 0, 8, 8))
-        bar.pack(fill="x")
-        ttk.Button(bar, text="Zkontrolovat", command=self.check).pack(side="left")
-        self.export_btn = ttk.Button(bar, text="Uložit report",
-                                     command=self.export, state="disabled")
-        self.export_btn.pack(side="left", padx=8)
-        self.summary = ttk.Label(bar, text="", font=("", 10, "bold"))
-        self.summary.pack(side="left", padx=16)
+def _nacti_tmavy():
+    """Zapamatovaný režim. Chybějící i poškozené nastavení znamená světlý."""
+    try:
+        with open(NASTAVENI, encoding="utf-8") as f:
+            return f.read().strip() == "tmavy"
+    except OSError:
+        return False
 
-        self.tree = ttk.Treeview(self, columns=_COLUMNS, show="headings")
-        widths = (110, 110, 70, 100, 100, 60, 60, 150, 260, 320)
-        for col, w in zip(_COLUMNS, widths):
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=w, stretch=col == "Problémy")
-        for status, color in _TAG_COLORS.items():
-            self.tree.tag_configure(status, background=color)
-        scroll = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y")
-        self.tree.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
-    def _file_row(self, parent, row, text, var, types):
-        ttk.Label(parent, text=text, width=18).grid(row=row, column=0, sticky="w")
-        ttk.Entry(parent, textvariable=var).grid(row=row, column=1,
-                                                 sticky="ew", padx=4)
-        ttk.Button(parent, text="Vybrat…",
-                   command=lambda: var.set(
-                       filedialog.askopenfilename(filetypes=types) or var.get())
-                   ).grid(row=row, column=2)
+def _uloz_tmavy(tmavy):
+    """Když se zapsat nedá, přepínač funguje dál -- jen si to nezapamatuje."""
+    try:
+        with open(NASTAVENI, "w", encoding="utf-8") as f:
+            f.write("tmavy" if tmavy else "svetly")
+    except OSError:
+        pass
 
-    def check(self) -> None:
-        if not self.pdf_path.get() or not self.xlsx_path.get():
-            messagebox.showwarning("Kontrola skla",
-                                   "Vyberte prosím oba soubory.")
-            return
+
+def _cesta(vybrano):
+    """Dialog vrací podle platformy n-tici cest, nebo rovnou jednu cestu."""
+    if not vybrano:
+        return None
+    return os.path.normpath(vybrano if isinstance(vybrano, str) else vybrano[0])
+
+
+def _problemy(pocet):
+    if pocet == 1:
+        return "problém"
+    return "problémy" if 2 <= pocet <= 4 else "problémů"
+
+
+class Api:
+    """Co smí zavolat stránka. Veškeré porovnávání zůstává v modulech vedle."""
+
+    def __init__(self):
+        self.vysledky = []
+
+    def zaklad(self):
+        return {"tmavy": _nacti_tmavy()}
+
+    # --- soubory ---------------------------------------------------------
+    def prochazet(self, pole):
+        okna = webview.windows
+        if not okna:
+            return None
+        typy = ("PDF (*.pdf)",) if pole == "pdf" else ("Excel (*.xlsx)",)
+        return _cesta(okna[0].create_file_dialog(webview.FileDialog.OPEN,
+                                                 file_types=typy))
+
+    # --- pretazeni -------------------------------------------------------
+    def dropnuto(self, cesty):
+        """Roztridi pretazene soubory podle pripony do spravneho pole."""
+        pole = {}
+        for c in cesty:
+            c = os.path.normpath(c)
+            if c.lower().endswith(".pdf"):
+                pole["pdf"] = c
+            elif c.lower().endswith(".xlsx"):
+                pole["xlsx"] = c
+        if not pole:
+            return {"hlaska": "Přetáhněte fakturu (*.pdf) nebo objednávku (*.xlsx)."}
+        return pole
+
+    # --- kontrola --------------------------------------------------------
+    def zkontrolovat(self, pdf, xlsx):
+        if not pdf or not xlsx:
+            return {"stav": "Vyberte prosím oba soubory.", "klic": "varovna"}
         try:
-            invoice_items = parse_invoice(self.pdf_path.get())
-            order_items = parse_order(self.xlsx_path.get())
-        except Exception as exc:
+            faktura = parse_invoice(pdf)
+            objednavka = parse_order(xlsx)
+        except Exception as chyba:
             traceback.print_exc()
-            messagebox.showerror("Chyba při čtení souborů", str(exc))
-            return
-        if not invoice_items:
-            messagebox.showerror(
-                "Kontrola skla",
-                "Formát faktury nebyl rozpoznán — nenašel jsem žádné položky.")
-            return
-        if not order_items:
-            messagebox.showerror(
-                "Kontrola skla",
-                "V objednávce nebyly nalezeny žádné řádky.")
-            return
+            self.vysledky = []
+            return {"chyba": f"Soubory se nepodařilo přečíst:\n\n{chyba}",
+                    "stav": "Chyba při čtení souborů.", "klic": "varovna"}
 
-        self.results = match_items(order_items, invoice_items)
-        self.tree.delete(*self.tree.get_children())
-        for r in self.results:
-            values = result_row(r)
-            self.tree.insert("", "end", values=values, tags=(r.status,))
-        ok = sum(1 for r in self.results if r.status == "OK")
-        total = len(self.results)
-        problems = total - ok
-        self.summary.config(
-            text=f"{ok} z {total} položek v pořádku, {problems} "
-                 + ("problém" if problems == 1 else
-                    "problémy" if 2 <= problems <= 4 else "problémů"))
-        self.export_btn.config(state="normal")
+        if not faktura:
+            self.vysledky = []
+            return {"chyba": "Formát faktury nebyl rozpoznán — "
+                             "nenašel jsem žádné položky.",
+                    "stav": "Formát faktury nebyl rozpoznán.", "klic": "varovna"}
+        if not objednavka:
+            self.vysledky = []
+            return {"chyba": "V objednávce nebyly nalezeny žádné řádky.",
+                    "stav": "Objednávka je prázdná.", "klic": "varovna"}
 
-    def export(self) -> None:
-        path = filedialog.asksaveasfilename(
-            defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")],
-            initialfile="kontrola_skla.xlsx")
-        if not path:
-            return
+        self.vysledky = match_items(objednavka, faktura)
+        pocty = Counter(v.status for v in self.vysledky)
+        celkem, ok = len(self.vysledky), pocty["OK"]
+        potize = celkem - ok
+        return {
+            "radky": [result_row(v) for v in self.vysledky],
+            "bilance": {"celkem": celkem, "ok": ok, "rozdil": pocty["WARNING"],
+                        "chybi": pocty["MISSING"], "navic": pocty["EXTRA"]},
+            "stav": f"{ok} z {celkem} položek v pořádku, "
+                    f"{potize} {_problemy(potize)}",
+            "klic": "varovna" if potize else "ok",
+        }
+
+    # --- report ----------------------------------------------------------
+    def ulozit(self):
+        okna = webview.windows
+        if not self.vysledky or not okna:
+            return {"ok": False,
+                    "hlaska": "Není co ukládat — nejdřív spusťte kontrolu."}
+        cesta = _cesta(okna[0].create_file_dialog(
+            webview.FileDialog.SAVE, save_filename="kontrola_skla.xlsx",
+            file_types=("Excel (*.xlsx)",)))
+        if not cesta:
+            return {"ok": False, "hlaska": ""}
+        if not cesta.lower().endswith(".xlsx"):
+            cesta += ".xlsx"
         try:
-            write_report(self.results, path)
-        except Exception as exc:
-            messagebox.showerror("Chyba při ukládání", str(exc))
-            return
-        messagebox.showinfo("Kontrola skla", f"Report uložen:\n{path}")
+            write_report(self.vysledky, cesta)
+        except Exception as chyba:
+            traceback.print_exc()
+            return {"ok": False, "hlaska": f"Report se nepodařilo uložit: {chyba}"}
+        return {"ok": True, "hlaska": f"Report uložen: {cesta}"}
+
+    def uloz_rezim(self, tmavy):
+        _uloz_tmavy(bool(tmavy))
+
+
+def _pripoj_drop(okno, api):
+    """Cesty přetažených souborů dá jen Python -- prohlížeč zná pouze jména."""
+    def upusteno(e):
+        cesty = [f.get("pywebviewFullPath") for f in e["dataTransfer"]["files"]]
+        odpoved = api.dropnuto([c for c in cesty if c])
+        okno.evaluate_js(f"window.prijmiDropnute({json.dumps(odpoved)})")
+
+    okno.dom.document.events.drop += DOMEventHandler(upusteno, True, True)
+
+
+def main():
+    api = Api()
+    okno = webview.create_window(
+        "Kontrola skla  ·  objednávka vs. faktura",
+        os.path.join(slozka_webu(), "index.html"),
+        js_api=api, width=1280, height=820, min_size=(960, 620),
+        background_color="#ffffff")
+    webview.start(lambda: _pripoj_drop(okno, api), private_mode=False)
 
 
 if __name__ == "__main__":
-    App().mainloop()
+    if "--kontrola" in sys.argv:
+        # CI: zabalena binarka musi mit uvnitr web/, jinak by se otevrelo prazdno
+        sys.exit(0 if os.path.isfile(os.path.join(slozka_webu(), "index.html")) else 1)
+    main()
