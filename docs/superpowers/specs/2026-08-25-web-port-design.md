@@ -159,9 +159,22 @@ Vendored into `web/vendor/`, no package manager at runtime:
 Roughly 2.6 MB, which PyInstaller will also fold into the desktop binaries where it is dead
 weight. On a 36 MB binary that is not worth excluding.
 
+The same two packages are `devDependencies` in a `package.json`, because the Node tests
+need a real reader to check what was written, and the parity script needs pdf.js outside a
+browser. Nothing installs at runtime and the served page never resolves a bare specifier —
+`npm run vendor` copies the three files out of `node_modules` into `web/vendor/`, and that
+copy is committed.
+
+Both libraries are passed in as arguments rather than imported by the `lib/` modules
+(`parseOrder(ExcelJS, file)`, `extractLines(pdfjsLib, file)`). The browser hands over the
+global from a plain script tag, Node hands over the `node_modules` import, and the pure
+logic stays importable with no library at all.
+
 ## Testing
 
-`node --test`, which ships with Node. No npm dependencies, matching the no-build-step rule.
+`node --test`, which ships with Node. No test framework; the only installed packages are
+the two libraries listed under Dependencies, present so the tests can read back what the
+code wrote.
 
 Mirrored from the Python suite:
 
