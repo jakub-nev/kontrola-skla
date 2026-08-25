@@ -29,7 +29,7 @@ import { tmpdir } from "node:os";
 import ExcelJS from "exceljs";
 import { parseOrder, parseOrderRows } from "../web/lib/order-parser.js";
 
-const VZOR = join(import.meta.dirname, "..",
+const VZOR = join(import.meta.dirname, "..", "Glass_solutions",
                   "objednavka_sklo_VltavaHolding_16.9.25.xlsx");
 
 test("row count ignores trailing empty rows", async () => {

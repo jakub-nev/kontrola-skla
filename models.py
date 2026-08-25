@@ -30,6 +30,7 @@ class InvoiceItem:
     spacer: int | None   # distanční rámeček width in mm, e.g. 18
     composition_raw: str # e.g. "SGG Climatop XN PXN 4mm / PLC 4mm / PXN 4mm"
     panes: list[float] = field(default_factory=list)  # e.g. [4, 4, 4]; [] = unknown
+    provider: str = ""   # which supplier layout this was read from
 
 
 @dataclass

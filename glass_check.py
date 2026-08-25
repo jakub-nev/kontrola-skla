@@ -126,7 +126,7 @@ class Api:
             "radky": [result_row(v) for v in self.vysledky],
             "bilance": {"celkem": celkem, "ok": ok, "rozdil": pocty["WARNING"],
                         "chybi": pocty["MISSING"], "navic": pocty["EXTRA"]},
-            "stav": f"{ok} z {celkem} položek v pořádku, "
+            "stav": f"{faktura[0].provider} — {ok} z {celkem} položek v pořádku, "
                     f"{potize} {_problemy(potize)}",
             "klic": "varovna" if potize else "ok",
         }
