@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests-js/*.mjs",
-    "vendor": "node scripts/vendor.mjs"
+    "vendor": "node scripts/vendor.mjs",
+    "parita": "node scripts/parita.mjs"
   },
   "devDependencies": {
     "exceljs": "4.4.0",
