@@ -45,7 +45,7 @@ Binárky staví GitHub Actions (workflow `.github/workflows/build.yml`) — nen�
 potřeba vlastní Mac ani nic instalovat. Push tagu `v*` spustí build a vydá
 [release](https://github.com/jakub-nev/PDF_read/releases) se dvěma soubory:
 
-- **Windows** — `Kontrola skla.exe`, jeden soubor, stačí spustit. SmartScreen
+- **Windows** — `KontrolaSkla.exe`, jeden soubor, stačí spustit. SmartScreen
   při prvním spuštění varuje: *Další informace* → *Přesto spustit*.
 - **Mac** — `KontrolaSkla-intel.dmg`, Intel (x86_64) build, který běží nativně
   na Intel Macích i na Apple Silicon přes Rosetta. Poprvé aplikaci otevřete

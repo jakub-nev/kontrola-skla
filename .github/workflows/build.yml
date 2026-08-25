@@ -40,7 +40,7 @@ jobs:
       - name: Build .exe
         run: >
           pyinstaller --noconfirm --onefile --windowed
-          --name "Kontrola skla" --add-data "web;web"
+          --name KontrolaSkla --add-data "web;web"
           --exclude-module PyQt5 --exclude-module PyQt6
           --exclude-module PySide2 --exclude-module PySide6
           --exclude-module qtpy --exclude-module gi
@@ -48,12 +48,12 @@ jobs:
           glass_check.py
 
       - name: Verify web/ is inside the binary
-        run: '& "dist/Kontrola skla.exe" --kontrola'
+        run: ./dist/KontrolaSkla.exe --kontrola
 
       - uses: actions/upload-artifact@v4
         with:
           name: KontrolaSkla-windows
-          path: dist/Kontrola skla.exe
+          path: dist/KontrolaSkla.exe
           if-no-files-found: error
 
   macos-intel:
@@ -172,4 +172,4 @@ jobs:
           otevřete a přetáhněte aplikaci do Aplikací. Poprvé ji spusťte pravým
           tlačítkem -> *Open*, jinak ji Gatekeeper zablokuje.
           POZNAMKY
-          gh release create "$GITHUB_REF_NAME" --title "Kontrola skla $GITHUB_REF_NAME" --notes-file notes.md "dist/KontrolaSkla-windows/Kontrola skla.exe" "dist/KontrolaSkla-intel/KontrolaSkla-intel.dmg"
+          gh release create "$GITHUB_REF_NAME" --title "Kontrola skla $GITHUB_REF_NAME" --notes-file notes.md dist/KontrolaSkla-windows/KontrolaSkla.exe "dist/KontrolaSkla-intel/KontrolaSkla-intel.dmg"
