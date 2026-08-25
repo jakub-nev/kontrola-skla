@@ -91,14 +91,20 @@ export function webBackend(pdfjsLib, ExcelJS) {
       if (!vysledky.length) {
         return { ok: false, hlaska: "Není co ukládat — nejdřív spusťte kontrolu." };
       }
-      const buf = await reportBuffer(ExcelJS, vysledky);
+      let buf;
+      try {
+        buf = await reportBuffer(ExcelJS, vysledky);
+      } catch (chyba) {
+        console.error(chyba);
+        return { ok: false, hlaska: `Report se nepodařilo uložit: ${chyba.message}` };
+      }
       const url = URL.createObjectURL(new Blob([buf], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const a = document.createElement("a");
       a.href = url;
       a.download = "kontrola_skla.xlsx";
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
       return { ok: true, hlaska: "Report uložen: kontrola_skla.xlsx" };
     },
 
