@@ -39,7 +39,11 @@ function naCislo(hodnota, vychozi = 1) {
   if (hodnota === null || hodnota === undefined || String(hodnota).trim() === "") {
     return vychozi;
   }
-  return Math.trunc(Number(String(hodnota).replace(",", ".")));
+  const cislo = Math.trunc(Number(String(hodnota).replace(",", ".")));
+  if (!Number.isFinite(cislo)) {
+    throw new Error(`V objednávce je neplatná číselná hodnota: "${hodnota}"`);
+  }
+  return cislo;
 }
 
 /** Sloupec sedí, jen když je to celé slovo -- "Kusovník" není "Kus". */
@@ -47,6 +51,17 @@ function sloupecSedi(jmeno, predpona) {
   return jmeno === predpona
     || jmeno.startsWith(predpona + " ")
     || jmeno.startsWith(predpona + "(");
+}
+
+/** ExcelJS někdy vrátí buňku jako objekt místo prostého scalaru: vzorec
+ *  {formula, result}, formátovaný text {richText:[...]}, odkaz {text, hyperlink}. */
+function rozbalBunku(v) {
+  if (v && typeof v === "object") {
+    if (v.result !== undefined) return v.result;
+    if (Array.isArray(v.richText)) return v.richText.map((cast) => cast.text ?? "").join("");
+    if (v.text !== undefined) return v.text;
+  }
+  return v;
 }
 
 /** Řádky sešitu (první je hlavička) -> položky objednávky. */
@@ -107,7 +122,7 @@ export async function parseOrder(ExcelJS, source) {
   const rows = [];
   ws.eachRow({ includeEmpty: false }, (row) => {
     // values je 1-based a nultý prvek je prázdný
-    rows.push(row.values.slice(1).map((v) => (v && v.result !== undefined ? v.result : v)));
+    rows.push(row.values.slice(1).map(rozbalBunku));
   });
   return parseOrderRows(rows);
 }

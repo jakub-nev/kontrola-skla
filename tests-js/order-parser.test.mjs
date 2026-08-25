@@ -24,6 +24,8 @@ test("skladba unparseable returns null", () => {
 });
 
 import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import ExcelJS from "exceljs";
 import { parseOrder, parseOrderRows } from "../web/lib/order-parser.js";
 
@@ -88,4 +90,32 @@ test("zero in label and number fields becomes empty string", () => {
   assert.equal(it.number, "");
   assert.equal(it.label, "");
   assert.equal(it.quantity, 5);
+});
+
+test("non-numeric width throws and names the offending value", () => {
+  const rows = [
+    ["Položka", "Objekt", "Označení pozice", "Šířka (mm)", "Výška (mm)", "Kus",
+     "Skladba skla", "Typ skla"],
+    [1, "x", 1, "cca 800", 600, 1, "4-16-4", "dvojsklo"],
+  ];
+  assert.throws(() => parseOrderRows(rows), /cca 800/);
+});
+
+test("richText header cell still binds its column", async () => {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("List1");
+  ws.addRow(["Položka", "Objekt", "Označení pozice",
+    { richText: [{ text: "Šířka " }, { font: { bold: true }, text: "(mm)" }] },
+    "Výška (mm)", "Kus", "Skladba skla", "Typ skla"]);
+  ws.addRow([1, "x", 1, 800, 600, 1, "4-16-4", "dvojsklo"]);
+
+  const dir = await mkdtemp(join(tmpdir(), "order-parser-"));
+  const soubor = join(dir, "richtext.xlsx");
+  try {
+    await wb.xlsx.writeFile(soubor);
+    const [it] = await parseOrder(ExcelJS, soubor);
+    assert.equal(it.width, 800);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

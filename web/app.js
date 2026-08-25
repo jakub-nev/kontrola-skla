@@ -137,6 +137,8 @@ async function spustit() {
   DESKTOP = Boolean(window.pywebview);
   if (DESKTOP) {
     backend = desktopBackend();
+    $("#pdf").readOnly = false;                  // pro případ, že časovač mezitím zvolil web
+    $("#xlsx").readOnly = false;
   } else {
     const pdfjsLib = await import("./vendor/pdf.mjs");
     pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.mjs";
@@ -153,5 +155,11 @@ function jednou() {
   spusteno = true;
   spustit();
 }
-window.addEventListener("pywebviewready", jednou, { once: true });
+window.addEventListener("pywebviewready", () => {
+  if (spusteno && !DESKTOP) {
+    spustit();      // časovač doběhl dřív a zvolil webový backend -- přepnout na desktopový
+  } else {
+    jednou();
+  }
+});
 setTimeout(jednou, 700);        // v prohlížeči pywebviewready nikdy nepřijde
