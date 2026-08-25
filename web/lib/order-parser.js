@@ -76,17 +76,17 @@ export function parseOrderRows(rows) {
     const w = dej(row, "width");
     const h = dej(row, "height");
     if (w === null || h === null) continue;          // koncové prázdné řádky
-    const skladbaRaw = String(dej(row, "skladbaRaw") ?? "").trim();
+    const skladbaRaw = String(dej(row, "skladbaRaw") || "").trim();
     const [panes, gaps] = parseSkladba(skladbaRaw);
     polozky.push({
-      number: String(dej(row, "number") ?? ""),
-      objekt: String(dej(row, "objekt") ?? "").trim(),
-      label: String(dej(row, "label") ?? "").trim(),
+      number: String(dej(row, "number") || ""),
+      objekt: String(dej(row, "objekt") || "").trim(),
+      label: String(dej(row, "label") || "").trim(),
       width: naCislo(w),
       height: naCislo(h),
       quantity: naCislo(dej(row, "quantity"), 1),
       skladbaRaw,
-      typ: String(dej(row, "typ") ?? "").trim(),
+      typ: String(dej(row, "typ") || "").trim(),
       panes,
       gaps,
     });

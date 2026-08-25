@@ -77,3 +77,15 @@ test("kusovnik column not mistaken for kus", () => {
   ];
   assert.equal(parseOrderRows(rows)[0].quantity, 3);
 });
+
+test("zero in label and number fields becomes empty string", () => {
+  const rows = [
+    ["Položka", "Objekt", "Označení pozice", "Šířka (mm)", "Výška (mm)", "Kus",
+     "Skladba skla", "Typ skla"],
+    [0, "x", 0, 800, 600, 5, "4-16-4", "dvojsklo"],
+  ];
+  const [it] = parseOrderRows(rows);
+  assert.equal(it.number, "");
+  assert.equal(it.label, "");
+  assert.equal(it.quantity, 5);
+});
