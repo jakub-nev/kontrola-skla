@@ -211,6 +211,8 @@ tbody td.potize { color: var(--warn); }
   <div class="pas"><div class="stred"><dl class="bilance" id="bilance"></dl></div></div>
 
   <div class="stred telo">
+  <input type="file" id="pdf-soubor" accept=".pdf" hidden>
+  <input type="file" id="xlsx-soubor" accept=".xlsx" hidden>
   <div class="radek">
     <label for="pdf">Faktura (PDF)</label>
     <input id="pdf" spellcheck="false" placeholder="Vyberte fakturu od dodavatele">
@@ -246,6 +248,7 @@ tbody td.potize { color: var(--warn); }
   <span class="text" id="stav-text">Vyberte fakturu a objednávku.</span>
 </div></footer>
 
-<script src="app.js"></script>
+<script src="vendor/exceljs.min.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
