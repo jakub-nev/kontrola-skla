@@ -42,10 +42,16 @@ def result_row(r: MatchResult) -> list[str]:
     ]
 
 
+def sheet_title(results: list[MatchResult]) -> str:
+    """Which supplier this report came from. Excel caps sheet names at 31."""
+    provider = next((r.invoice_item.provider for r in results if r.invoice_item), "")
+    return f"Kontrola — {provider}"[:31] if provider else "Kontrola"
+
+
 def write_report(results: list[MatchResult], path: str | Path) -> None:
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Kontrola"
+    ws.title = sheet_title(results)
     ws.append(HEADERS)
     for cell in ws[1]:
         cell.font = Font(bold=True)

@@ -39,9 +39,16 @@ export function resultRow(r) {
 }
 
 /** ExcelJS se předává zvenčí, stejně jako u order-parseru. */
+/** Od kterého dodavatele report je. Excel má strop 31 znaků na název listu. */
+export function sheetTitle(results) {
+  const r = results.find((v) => v.invoiceItem);
+  const provider = r ? r.invoiceItem.provider : "";
+  return provider ? `Kontrola — ${provider}`.slice(0, 31) : "Kontrola";
+}
+
 export async function reportBuffer(ExcelJS, results) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Kontrola");
+  const ws = wb.addWorksheet(sheetTitle(results));
   ws.addRow(HEADERS).font = { bold: true };
   for (const r of results) {
     const row = ws.addRow(resultRow(r));

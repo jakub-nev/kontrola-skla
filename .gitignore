@@ -16,3 +16,7 @@ __pycache__/
 
 # Node
 node_modules/
+
+# Zákaznické dokumenty. Faktury nikdy (*.pdf výš), a z objednávek jen ta jedna,
+# kterou potřebují testy -- víc jich do veřejného repa nepatří.
+/Sklenarstvi_nonstop/

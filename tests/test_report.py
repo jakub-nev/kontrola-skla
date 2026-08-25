@@ -29,3 +29,18 @@ def test_write_report(tmp_path):
     assert rows[3][0] == "navíc na faktuře"
     assert "830 x 1400" in str(rows[1][3])   # order dims column
     assert "830 x 1400" in str(rows[3][4])   # invoice dims column
+
+
+def test_sheet_title_names_the_provider():
+    from report import sheet_title
+    o = OrderItem(number="1", objekt="x", label="1", width=830, height=1400,
+                  quantity=1, skladba_raw="4-16-4", typ="dvojsklo",
+                  panes=[4.0, 4.0], gaps=[16.0])
+    i = InvoiceItem(position="001", label="1", quantity=1, width=830, height=1400,
+                    spacer=16, composition_raw="x", panes=[4.0, 4.0],
+                    provider="Sklenářství NONSTOP")
+    title = sheet_title([MatchResult("OK", o, i, [])])
+    assert title == "Kontrola — Sklenářství NONSTOP"
+    assert len(title) <= 31                      # strop Excelu
+    # bez faktury (jen chybějící položky) zůstane holý název
+    assert sheet_title([MatchResult("MISSING", o, None, [])]) == "Kontrola"

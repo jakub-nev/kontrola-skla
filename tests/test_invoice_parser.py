@@ -5,7 +5,7 @@ import pytest
 
 from invoice_parser import parse_invoice, parse_composition
 
-SAMPLE = Path(__file__).resolve().parent.parent / "faktura_sklo.pdf"
+SAMPLE = Path(__file__).resolve().parent.parent / "Glass_solutions" / "faktura_sklo.pdf"
 
 
 # --- parse_composition ------------------------------------------------------

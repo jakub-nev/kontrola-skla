@@ -82,7 +82,8 @@ export function webBackend(pdfjsLib, ExcelJS) {
         radky: vysledky.map(resultRow),
         bilance: { celkem, ok: pocty.OK, rozdil: pocty.WARNING,
                    chybi: pocty.MISSING, navic: pocty.EXTRA },
-        stav: `${pocty.OK} z ${celkem} položek v pořádku, ${potize} ${problemy(potize)}`,
+        stav: `${faktura[0].provider} — ${pocty.OK} z ${celkem} položek v pořádku, `
+               + `${potize} ${problemy(potize)}`,
         klic: potize ? "varovna" : "ok",
       };
     },

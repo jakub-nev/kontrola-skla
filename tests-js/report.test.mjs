@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import ExcelJS from "exceljs";
 
-import { HEADERS, reportBuffer, resultRow } from "../web/lib/report.js";
+import { HEADERS, reportBuffer, resultRow, sheetTitle } from "../web/lib/report.js";
 
 const o = { number: "1", objekt: "becica", label: "1", width: 830, height: 1400,
             quantity: 1, skladbaRaw: "4-18-4-18-4", typ: "trojsklo",
@@ -41,4 +41,14 @@ test("workbook round trip", async () => {
   assert.ok(String(ws.getRow(2).getCell(4).value).includes("830 x 1400"));
   assert.ok(String(ws.getRow(4).getCell(5).value).includes("830 x 1400"));
   assert.equal(ws.getRow(2).getCell(1).fill.fgColor.argb, "FFC6EFCE");
+});
+
+test("sheet title names the provider", () => {
+  const iN = { ...i, provider: "Sklenářství NONSTOP" };
+  const title = sheetTitle([{ status: "OK", orderItem: o, invoiceItem: iN, problems: [] }]);
+  assert.equal(title, "Kontrola — Sklenářství NONSTOP");
+  assert.ok(title.length <= 31);                 // strop Excelu
+  // bez faktury (jen chybějící položky) zůstane holý název
+  assert.equal(sheetTitle([{ status: "MISSING", orderItem: o, invoiceItem: null, problems: [] }]),
+               "Kontrola");
 });

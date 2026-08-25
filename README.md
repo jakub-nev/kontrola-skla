@@ -24,6 +24,19 @@ v souboru `~/.kontrola_skla`.
 Položky se párují podle rozměru (šířka × výška, případně prohozené) a
 porovnává se počet kusů a skladba (tloušťky skel a meziskelní rámeček).
 
+## Dva dodavatelé
+
+Aplikace čte dvě různá rozvržení dokumentů a pozná je sama — nic nevybíráte:
+
+- **Glassolutions** — faktura, položka na jednom řádku, skladba v bloku `SGG` nad ní.
+- **Sklenářství NONSTOP** — cenová nabídka, položka přes několik řádků zakončená
+  souhrnem `Celkem: N Ks.`, skladba se čte podle značky rámečku `TPS`.
+
+Který formát se rozpoznal, uvidíte ve stavovém řádku a v názvu listu v reportu.
+
+Když se skladba přečíst nedá (třeba neznámý typ rámečku), aplikace ji radši
+neporovná, než aby ohlásila neshodu, která ve skutečnosti není.
+
 ## Okno
 
 Okno je nativní, obsah je webový: vzhled leží ve `web/index.html`

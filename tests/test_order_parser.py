@@ -5,7 +5,7 @@ import pytest
 
 from order_parser import parse_order, parse_skladba
 
-SAMPLE = Path(__file__).resolve().parent.parent / "objednavka_sklo_VltavaHolding_16.9.25.xlsx"
+SAMPLE = Path(__file__).resolve().parent.parent / "Glass_solutions" / "objednavka_sklo_VltavaHolding_16.9.25.xlsx"
 
 
 # --- parse_skladba ---------------------------------------------------------
