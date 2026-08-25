@@ -1,29 +1,15 @@
 "use strict";
-/* Obsluha okna. Veskere porovnavani zustava v Pythonu, tohle jen vola api a kresli. */
+/* Obsluha okna. Porovnávání dělá backend -- v aplikaci Python, v prohlížeči
+   lib/. Tenhle soubor jen kreslí a sbírá kliknutí. */
+
+import { desktopBackend } from "./api-desktop.js";
+import { webBackend } from "./api-web.js";
 
 const $ = (s) => document.querySelector(s);
 
-/* Bez pywebview (tj. v prohlizeci pri ladeni vzhledu) se pouziji ukazkova data,
-   at jde stranka otevrit a doladit bez spousteni cele aplikace.
-   Pozor: window.pywebview vznika az po nacteni skriptu, takze se to nesmi
-   rozhodovat hned pri parsovani -- jinak bezi na ukazkach i v aplikaci. */
-let UKAZKA = true;
-const api = () => window.pywebview.api;
-
-const MOCK = {
-  bilance: { celkem: 4, ok: 1, rozdil: 1, chybi: 1, navic: 1 },
-  radky: [
-    ["OK", "Kanceláře", "1", "1346 x 975", "1346 x 975", "6", "6",
-     "4-16-4-16-4", "SGG PXN 4mm / PLC 4mm / PXN 4mm | rámeček 16 mm", ""],
-    ["rozdíl", "Kanceláře", "2", "550 x 845", "550 x 845", "3", "2",
-     "4-18-4-18-4", "SGG PXN 4mm / PLC 4mm / PXN 4mm | rámeček 16 mm",
-     "počet kusů: objednáno 3, fakturováno 2; rámeček: objednáno 18/18 mm, faktura 16 mm"],
-    ["chybí na faktuře", "Sklad", "3", "2335 x 1350", "", "1", "",
-     "33.2-16-4-16-6", "", "rozměr 2335 x 1350 na faktuře chybí"],
-    ["navíc na faktuře", "", "007", "", "915 x 1965", "", "1",
-     "", "SGG PXN 6mm / PLC 4mm | rámeček 20 mm", "rozměr 915 x 1965 nebyl objednán"],
-  ],
-};
+let backend = null;
+let DESKTOP = false;
+const api = () => backend;
 
 /* ---------- vykreslovani ---------- */
 const KLICE = { "OK": "s-ok", "rozdíl": "s-warning",
@@ -74,14 +60,13 @@ function nastavStav(text, klic) {
 /* ---------- rezim ---------- */
 function nastavRezim(tmavy) {
   document.documentElement.dataset.rezim = tmavy ? "tmavy" : "svetly";
-  if (!UKAZKA) api().uloz_rezim(tmavy);
+  api().uloz_rezim(tmavy);
 }
 
 /* ---------- akce ---------- */
 const PRAZDNA_BILANCE = { celkem: 0, ok: 0, rozdil: 0, chybi: 0, navic: 0 };
 
 async function zkontrolovat() {
-  if (UKAZKA) { nastavStav("Ukázková data — kontrola běží jen v aplikaci.", "varovna"); return; }
   nastavStav("Čtu soubory…", "");
   const v = await api().zkontrolovat($("#pdf").value, $("#xlsx").value);
   if (v.chyba !== undefined) {                   // necteme, nemame co ukladat
@@ -99,7 +84,7 @@ async function zkontrolovat() {
 /* ---------- prihlaseni udalosti ---------- */
 document.addEventListener("click", async (e) => {
   const proch = e.target.closest("[data-prochazet]");
-  if (proch && !UKAZKA) {
+  if (proch) {
     const pole = $("#" + proch.dataset.prochazet);
     const cesta = await api().prochazet(pole.id);
     if (cesta) pole.value = cesta;
@@ -109,7 +94,7 @@ document.addEventListener("click", async (e) => {
     nastavRezim(document.documentElement.dataset.rezim !== "tmavy");
   } else if (e.target.closest("#zkontrolovat")) {
     zkontrolovat();
-  } else if (e.target.closest("#ulozit") && !UKAZKA) {
+  } else if (e.target.closest("#ulozit")) {
     const v = await api().ulozit();
     if (v.hlaska) nastavStav(v.hlaska, v.ok ? "ok" : "varovna");
   }
@@ -129,31 +114,44 @@ document.addEventListener("keydown", (e) => {
   if (u === "drop" || !e.relatedTarget) document.body.classList.remove("pretahuje");
 }));
 
-window.prijmiDropnute = function (v) {           // vola Python po dropu
+window.prijmiDropnute = function (v) {           // volá Python po dropu
   if (v.pdf) $("#pdf").value = v.pdf;
   if (v.xlsx) $("#xlsx").value = v.xlsx;
   nastavStav(v.hlaska || "Soubory načteny — stiskněte Zkontrolovat.",
              v.hlaska ? "varovna" : "");
 };
 
+document.addEventListener("drop", (e) => {
+  if (DESKTOP) return;                           // cesty dodá Python
+  e.preventDefault();
+  window.prijmiDropnute(backend.prijmiSoubory([...e.dataTransfer.files]));
+});
+
 async function start() {
-  if (UKAZKA) {                                  // ladeni vzhledu v prohlizeci
-    kresliBilanci(MOCK.bilance);
-    kresliVysledky(MOCK.radky);
-    $("#ulozit").disabled = false;
-    return;
-  }
   kresliBilanci(PRAZDNA_BILANCE);
   const z = await api().zaklad();
   document.documentElement.dataset.rezim = z.tmavy ? "tmavy" : "svetly";
 }
 
-let spusteno = false;
-function spustit() {
-  if (spusteno) return;
-  spusteno = true;
-  UKAZKA = !window.pywebview;
+async function spustit() {
+  DESKTOP = Boolean(window.pywebview);
+  if (DESKTOP) {
+    backend = desktopBackend();
+  } else {
+    const pdfjsLib = await import("./vendor/pdf.mjs");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.mjs";
+    backend = webBackend(pdfjsLib, window.ExcelJS);
+    $("#pdf").readOnly = true;                   // prohlížeč cestu nezná
+    $("#xlsx").readOnly = true;
+  }
   start();
 }
-window.addEventListener("pywebviewready", spustit, { once: true });
-setTimeout(spustit, 700);        // v prohlizeci pywebviewready nikdy neprijde
+
+let spusteno = false;
+function jednou() {
+  if (spusteno) return;
+  spusteno = true;
+  spustit();
+}
+window.addEventListener("pywebviewready", jednou, { once: true });
+setTimeout(jednou, 700);        // v prohlížeči pywebviewready nikdy nepřijde
