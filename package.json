@@ -1,0 +1,13 @@
+{
+  "name": "kontrola-skla",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests-js/*.mjs",
+    "vendor": "node scripts/vendor.mjs"
+  },
+  "devDependencies": {
+    "exceljs": "4.4.0",
+    "pdfjs-dist": "6.2.108"
+  }
+}
