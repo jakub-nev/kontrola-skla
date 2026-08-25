@@ -1,6 +1,10 @@
-name: Build macOS app
+name: build
 
-# Builds a standalone "Kontrola skla.app" (wrapped in a .dmg) as an Intel
+# Builds the app where it belongs: PyInstaller cannot cross-compile, so the
+# .exe is built on Windows and the .app on macOS. Pushing a v* tag also
+# publishes both binaries as a GitHub release.
+#
+# The macOS half builds a standalone "Kontrola skla.app" (wrapped in a .dmg) as an Intel
 # (x86_64) binary, on the fast Apple Silicon runner via Rosetta 2. We install
 # the universal2 Python from python.org and force every step through
 # `arch -x86_64`, so PyInstaller bundles x86_64 binaries. A hard arch check
@@ -16,14 +20,43 @@ env:
 on:
   push:
     branches: [main]
-    paths:
-      - "**.py"
-      - "packaging/**"
-      - ".github/workflows/build-macos.yml"
+    tags: ["v*"]          # bez paths -- na tagu musi bezet vzdy
   workflow_dispatch:
 
 jobs:
-  build:
+  windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyinstaller pdfplumber openpyxl pywebview
+
+      # Jeden soubor: okno je HTML, takze web/ musi dovnitr binarky.
+      - name: Build .exe
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name "Kontrola skla" --add-data "web;web"
+          --exclude-module PyQt5 --exclude-module PyQt6
+          --exclude-module PySide2 --exclude-module PySide6
+          --exclude-module qtpy --exclude-module gi
+          --exclude-module cefpython3 --exclude-module tkinter
+          glass_check.py
+
+      - name: Verify web/ is inside the binary
+        run: '& "dist/Kontrola skla.exe" --kontrola'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KontrolaSkla-windows
+          path: dist/Kontrola skla.exe
+          if-no-files-found: error
+
+  macos-intel:
     name: Build (Intel x86_64)
     runs-on: macos-14   # Apple Silicon runner (fast queue), x86_64 via Rosetta
 
@@ -57,7 +90,10 @@ jobs:
           set -euo pipefail
           arch -x86_64 "$PY" -m pip install --upgrade pip
           # PyInstaller is pure-python + universal2 bootloaders -> install normally.
-          arch -x86_64 "$PY" -m pip install pyinstaller
+          # pywebview is pure-python too and its pyobjc wheels are universal2,
+          # so it carries x86_64 either way (and proxy_tools has no wheel at all,
+          # which the --only-binary install below could not resolve).
+          arch -x86_64 "$PY" -m pip install pyinstaller pywebview
           # The python.org interpreter is universal2, so sysconfig reports the
           # platform as "universal2" and a plain `pip install` may pull arm64
           # wheels (e.g. cryptography). Force x86_64-only wheels into an isolated
@@ -88,6 +124,12 @@ jobs:
           file "$BIN" | grep -q "x86_64" || {
             echo "::error::Built binary is not x86_64."; exit 1; }
 
+      - name: Verify web/ is inside the bundle
+        run: |
+          set -euo pipefail
+          # The window is HTML; without web/ the app would open blank.
+          "dist/Kontrola skla.app/Contents/MacOS/KontrolaSkla" --kontrola
+
       - name: Package .dmg
         run: |
           hdiutil create -volname "Kontrola skla" \
@@ -100,3 +142,34 @@ jobs:
           name: KontrolaSkla-intel
           path: dist/KontrolaSkla-intel.dmg
           if-no-files-found: error
+
+  release:
+    name: Release
+    needs: [windows, macos-intel]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<'POZNAMKY'
+          Aplikace není podepsaná, systém při prvním spuštění varuje.
+
+          **Windows** — stáhněte `Kontrola skla.exe` a spusťte.
+          SmartScreen: *Další informace* -> *Přesto spustit*.
+
+          **Mac (Intel i Apple Silicon)** — stáhněte `KontrolaSkla-intel.dmg`,
+          otevřete a přetáhněte aplikaci do Aplikací. Poprvé ji spusťte pravým
+          tlačítkem -> *Open*, jinak ji Gatekeeper zablokuje.
+          POZNAMKY
+          gh release create "$GITHUB_REF_NAME" --title "Kontrola skla $GITHUB_REF_NAME" --notes-file notes.md "dist/KontrolaSkla-windows/Kontrola skla.exe" "dist/KontrolaSkla-intel/KontrolaSkla-intel.dmg"
