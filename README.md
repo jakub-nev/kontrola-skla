@@ -43,7 +43,7 @@ naplní ukázkovými daty, takže se vzhled dá ladit bez spouštění aplikace.
 
 Binárky staví GitHub Actions (workflow `.github/workflows/build.yml`) — není
 potřeba vlastní Mac ani nic instalovat. Push tagu `v*` spustí build a vydá
-[release](https://github.com/jakub-nev/PDF_read/releases) se dvěma soubory:
+[release](https://github.com/jakub-nev/kontrola-skla/releases) se dvěma soubory:
 
 - **Windows** — `KontrolaSkla.exe`, jeden soubor, stačí spustit. SmartScreen
   při prvním spuštění varuje: *Další informace* → *Přesto spustit*.
