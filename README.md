@@ -39,6 +39,24 @@ naplní ukázkovými daty, takže se vzhled dá ladit bez spouštění aplikace.
     pip install pytest
     pytest
 
+## Ve webu, bez instalace
+
+<https://jakub-nev.github.io/kontrola-skla/>
+
+Stejná aplikace jako desktopová, jen běží v prohlížeči. Faktura ani objednávka
+nikam neodcházejí — všechno se počítá u vás, stránka je jen statický soubor.
+
+Porovnávací logika existuje dvakrát: v Pythonu pro desktop a v JavaScriptu
+(`web/lib/`) pro web. Opravu parseru je proto potřeba udělat na obou stranách
+a pak ověřit, že si obě verze pořád odpovídají:
+
+    npm install
+    npm test
+    npm run parita -- faktura.pdf objednavka.xlsx
+
+`npm run parita` pustí obě implementace na stejné dvojici souborů a vypíše
+rozdíly. V CI běžet nemůže, protože faktury se do repa nedávají.
+
 ## Hotové aplikace ke stažení
 
 Binárky staví GitHub Actions (workflow `.github/workflows/build.yml`) — není
